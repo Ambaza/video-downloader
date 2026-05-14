@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Downloader — Download Any Video</title>
+    <meta name="description" content="Download videos from YouTube, Vimeo, Twitter, TikTok, and 1000+ sites with ease.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Animated background -->
+    <div class="bg-gradient"></div>
+    <div class="bg-particles" id="particles"></div>
+
+    <!-- Main App -->
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                        <rect rx="8" width="32" height="32" fill="url(#logoGrad)" />
+                        <path d="M12 10L22 16L12 22V10Z" fill="white" />
+                        <path d="M16 22L16 26" stroke="white" stroke-width="2" stroke-linecap="round" />
+                        <path d="M13 25L19 25" stroke="white" stroke-width="2" stroke-linecap="round" />
+                        <defs>
+                            <linearGradient id="logoGrad" x1="0" y1="0" x2="32" y2="32">
+                                <stop stop-color="#6C63FF" />
+                                <stop offset="1" stop-color="#E040FB" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <h1>Video Downloader</h1>
+                    <span class="logo-subtitle">Download from 1000+ sites</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <span class="cookie-info" id="cookieInfo" style="display:none"></span>
+                <button class="btn-icon" id="btnSettings" title="Settings">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3" />
+                        <path
+                            d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
+                    </svg>
+                </button>
+                <button class="btn-icon" id="btnOpenFolder" title="Open downloads folder">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+                    </svg>
+                </button>
+                <div class="status-badge" id="statusBadge">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Checking...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- URL Input Section -->
+        <section class="input-section" id="inputSection">
+            <div class="input-card glass">
+                <div class="input-header">
+                    <h2>Paste a video link</h2>
+                    <p>YouTube, Vimeo, Twitter/X, TikTok, Instagram, Reddit, and more</p>
+                </div>
+                <div class="url-input-wrapper">
+                    <div class="url-input-container">
+                        <svg class="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
+                            <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+                        </svg>
+                        <input type="url" id="urlInput" placeholder="https://www.youtube.com/watch?v=..."
+                            autocomplete="off" spellcheck="false">
+                        <button class="btn-paste" id="btnPaste" title="Paste from clipboard">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                            </svg>
+                        </button>
+                    </div>
+                    <button class="btn-primary" id="btnFetch">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                        <span>Fetch Info</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Loading State -->
+        <section class="loading-section hidden" id="loadingSection">
+            <div class="loading-card glass">
+                <div class="loader">
+                    <div class="loader-ring"></div>
+                    <div class="loader-ring"></div>
+                    <div class="loader-ring"></div>
+                </div>
+                <p class="loading-text">Fetching video information...</p>
+                <p class="loading-sub">This may take a moment for some sites</p>
+            </div>
+        </section>
+
+        <!-- Video Info Section -->
+        <section class="video-section hidden" id="videoSection">
+            <div class="video-card glass">
+                <div class="video-preview">
+                    <img id="videoThumbnail" src="" alt="Video thumbnail">
+                    <div class="video-duration" id="videoDuration"></div>
+                    <div class="video-overlay">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="white" opacity="0.9">
+                            <path d="M8 5v14l11-7z" />
+                        </svg>
+                    </div>
+                </div>
+                <div class="video-details">
+                    <h3 id="videoTitle" class="video-title"></h3>
+                    <div class="video-meta">
+                        <span class="meta-item" id="videoUploader">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                                <circle cx="12" cy="7" r="4" />
+                            </svg>
+                            <span></span>
+                        </span>
+                        <span class="meta-item" id="videoViews">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                            </svg>
+                            <span></span>
+                        </span>
+                        <span class="meta-item" id="videoSource">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="2" y1="12" x2="22" y2="12" />
+                                <path
+                                    d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
+                            </svg>
+                            <span></span>
+                        </span>
+                    </div>
+
+                    <!-- Anime-Sama Episode Selection -->
+                    <div class="anime-sama-section hidden" id="asSection">
+                        <label class="section-label">Select Episode & Player</label>
+                        <div class="as-controls">
+                            <select id="asPlayerSelect" class="as-select"></select>
+                            <select id="asEpisodeSelect" class="as-select"></select>
+                        </div>
+                    </div>
+
+                    <!-- Quality Selection -->
+                    <div class="quality-section" id="qualitySection">
+                        <label class="section-label">Quality</label>
+                        <div class="quality-grid" id="qualityGrid"></div>
+                    </div>
+
+                    <!-- Download Button -->
+                    <button class="btn-download" id="btnDownload">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                        <span>Download Video</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Progress Section -->
+        <section class="progress-section hidden" id="progressSection">
+            <div class="progress-card glass">
+                <div class="progress-header">
+                    <div class="progress-title">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                        <span id="progressFilename">Downloading...</span>
+                    </div>
+                    <span class="progress-percent" id="progressPercent">0%</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar">
+                        <div class="progress-bar-glow"></div>
+                    </div>
+                </div>
+                <div class="progress-stats">
+                    <div class="stat">
+                        <span class="stat-label">Speed</span>
+                        <span class="stat-value" id="progressSpeed">—</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">ETA</span>
+                        <span class="stat-value" id="progressEta">—</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Size</span>
+                        <span class="stat-value" id="progressSize">—</span>
+                    </div>
+                </div>
+                <div class="progress-status" id="progressStatus"></div>
+                <!-- Warnings during download -->
+                <div class="progress-warnings hidden" id="progressWarnings"></div>
+            </div>
+        </section>
+
+        <!-- Complete Section -->
+        <section class="complete-section hidden" id="completeSection">
+            <div class="complete-card glass">
+                <div class="complete-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                </div>
+                <h3>Download Complete!</h3>
+                <p id="completeFilename" class="complete-filename"></p>
+                <div class="complete-actions">
+                    <button class="btn-secondary" id="btnOpenFolderComplete">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+                        </svg>
+                        Open Folder
+                    </button>
+                    <button class="btn-primary" id="btnDownloadAnother">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        Download Another
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Error Section -->
+        <section class="error-section hidden" id="errorSection">
+            <div class="error-card glass">
+                <div class="error-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="15" y1="9" x2="9" y2="15" />
+                        <line x1="9" y1="9" x2="15" y2="15" />
+                    </svg>
+                </div>
+                <h3>Something went wrong</h3>
+                <p id="errorMessage" class="error-message"></p>
+                <button class="btn-primary" id="btnRetry">Try Again</button>
+            </div>
+        </section>
+
+        <!-- Recent Downloads -->
+        <section class="history-section" id="historySection">
+            <div class="history-header">
+                <h2>Recent Downloads</h2>
+                <button class="btn-icon" id="btnRefreshHistory" title="Refresh">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10" />
+                        <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
+                    </svg>
+                </button>
+            </div>
+            <div class="history-list" id="historyList">
+                <div class="history-empty">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                        opacity="0.3">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    <p>No downloads yet</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Setup Banner (shown when yt-dlp is not installed) -->
+        <section class="setup-section hidden" id="setupSection">
+            <div class="setup-card glass">
+                <div class="setup-icon">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                </div>
+                <h3>yt-dlp Required</h3>
+                <p>This app requires <strong>yt-dlp</strong> to download videos. Install it with one command:</p>
+                <div class="setup-commands">
+                    <div class="command-block">
+                        <code>winget install yt-dlp</code>
+                        <button class="btn-copy"
+                            onclick="navigator.clipboard.writeText('winget install yt-dlp')">Copy</button>
+                    </div>
+                    <p class="setup-alt">or with pip: <code>pip install yt-dlp</code></p>
+                    <p class="setup-alt">For best quality merging, also install <a
+                            href="https://ffmpeg.org/download.html" target="_blank">ffmpeg</a>.</p>
+                </div>
+                <button class="btn-primary" onclick="location.reload()">I've installed it — Refresh</button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay hidden" id="settingsModal">
+        <div class="modal glass">
+            <div class="modal-header">
+                <h3>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3" />
+                        <path
+                            d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+                    </svg>
+                    Settings
+                </h3>
+                <button class="btn-icon" id="closeSettings">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <div class="setting-group">
+                    <label class="setting-label">🍪 Cookie File (for restricted content)</label>
+                    <p class="setting-desc">
+                        To download age-restricted or login-required videos, you need to export your
+                        browser cookies as a <code>cookies.txt</code> file.
+                    </p>
+                    <p id="cookieStatus" class="cookie-status inactive">⚠️ No cookie file uploaded</p>
+                    <div class="cookie-actions">
+                        <button class="btn-secondary" id="btnUploadCookie">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                                <polyline points="17 8 12 3 7 8" />
+                                <line x1="12" y1="3" x2="12" y2="15" />
+                            </svg>
+                            Upload cookies.txt
+                        </button>
+                        <input type="file" id="cookieFileInput" accept=".txt" style="display:none">
+                        <label class="toggle-wrapper">
+                            <input type="checkbox" id="useCookieToggle">
+                            <span class="toggle-label">Use cookies</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">How to export cookies</label>
+                    <ol class="setting-steps">
+                        <li>Install the <a
+                                href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc"
+                                target="_blank" style="color: var(--accent-1)">Get cookies.txt LOCALLY</a> Chrome
+                            extension (or equivalent for your browser)</li>
+                        <li>Go to the site you want to download from and <strong>log in</strong></li>
+                        <li>Click the extension icon → <strong>Export</strong> → saves a <code>cookies.txt</code> file
+                        </li>
+                        <li>Upload that file here using the button above</li>
+                    </ol>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">Downloads Folder</label>
+                    <p class="setting-value" id="downloadsDir">—</p>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">Tips for Tricky Sites</label>
+                    <ul class="setting-tips">
+                        <li><strong>Age-restricted sites</strong> — Export cookies from your browser after logging in.
+                        </li>
+                        <li><strong>Private videos</strong> — Must be logged in before exporting cookies.</li>
+                        <li><strong>Fragment errors</strong> — Try a lower quality or refresh the page URL and retry.
+                        </li>
+                        <li><strong>Geo-restricted</strong> — Use a VPN to access content not available in your region.
+                        </li>
+                        <li><strong>Best quality</strong> — Install <a href="https://ffmpeg.org/download.html"
+                                target="_blank" style="color: var(--accent-1)">ffmpeg</a> for merging best video + audio
+                            streams.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
