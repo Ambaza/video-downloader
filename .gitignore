@@ -1,0 +1,17 @@
+node_modules/
+# Fichiers de cookies — sensibles, ne jamais committer
+cookies.txt
+cookies.merged.txt
+cookies.synced.txt
+__pycache__/
+*.pyc
+
+# Binaires tiers embarqués (aria2) — à retélécharger, pas à versionner
+bin/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+.demo_ready
+dist/

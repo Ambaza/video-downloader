@@ -1,0 +1,12 @@
+{
+  "cookieMode": "browser",
+  "browserChoice": "edge",
+  "concurrentFragments": 8,
+  "torProfile": "",
+  "impersonate": "auto",
+  "embedSubs": false,
+  "embedThumbnail": false,
+  "embedMetadata": true,
+  "insecureTLS": false,
+  "lastFormat": "best"
+}

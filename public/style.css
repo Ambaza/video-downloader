@@ -1383,6 +1383,162 @@ body {
     font-weight: 600;
 }
 
+/* ─── Cookie Mode Cards ───────────────────── */
+.cookie-mode-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.cookie-mode-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition-smooth);
+    position: relative;
+}
+
+.cookie-mode-card:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+.cookie-mode-card.selected {
+    background: rgba(108, 99, 255, 0.08);
+    border-color: rgba(108, 99, 255, 0.35);
+    box-shadow: 0 0 12px rgba(108, 99, 255, 0.1);
+}
+
+.cookie-mode-card input[type="radio"] {
+    display: none;
+}
+
+.cookie-mode-card-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-muted);
+    flex-shrink: 0;
+    transition: var(--transition-smooth);
+}
+
+.cookie-mode-card.selected .cookie-mode-card-icon {
+    background: rgba(108, 99, 255, 0.15);
+    color: var(--accent-1);
+}
+
+.cookie-mode-card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+}
+
+.cookie-mode-card-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.cookie-mode-card-desc {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.cookie-mode-card.selected .cookie-mode-card-desc {
+    color: var(--text-secondary);
+}
+
+.cookie-mode-badge {
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 100px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+.cookie-mode-badge.recommended {
+    background: rgba(0, 230, 118, 0.1);
+    color: var(--success);
+    border: 1px solid rgba(0, 230, 118, 0.2);
+}
+
+/* ─── Test Cookies Button ─────────────────── */
+.btn-test-cookies {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: rgba(108, 99, 255, 0.1);
+    border: 1px solid rgba(108, 99, 255, 0.25);
+    border-radius: var(--radius-sm);
+    color: var(--accent-1);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.btn-test-cookies:hover {
+    background: rgba(108, 99, 255, 0.18);
+    border-color: rgba(108, 99, 255, 0.4);
+    transform: translateY(-1px);
+}
+
+.btn-test-cookies:active {
+    transform: translateY(0);
+}
+
+.btn-test-cookies.testing {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.btn-test-cookies.testing span::after {
+    content: '...';
+    animation: ellipsis 1.5s infinite;
+}
+
+@keyframes ellipsis {
+    0% { content: '.'; }
+    33% { content: '..'; }
+    66% { content: '...'; }
+}
+
+.test-result {
+    margin-top: 10px;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 0.78rem;
+    line-height: 1.5;
+    animation: fadeIn 0.2s ease;
+}
+
+.test-result.success {
+    background: rgba(0, 230, 118, 0.08);
+    border: 1px solid rgba(0, 230, 118, 0.15);
+    color: var(--success);
+}
+
+.test-result.error {
+    background: rgba(255, 82, 82, 0.08);
+    border: 1px solid rgba(255, 82, 82, 0.15);
+    color: var(--error);
+}
+
 /* ─── Cookie Upload UI ─────────────────────── */
 .cookie-status {
     padding: 8px 12px;
@@ -1591,4 +1747,466 @@ body {
 ::selection {
     background: rgba(108, 99, 255, 0.3);
     color: white;
+}
+/* ═══════════════════════════════════════════════
+   AJOUTS — annulation, file d'attente, réglages
+   ═══════════════════════════════════════════════ */
+
+/* ─── Bouton Annuler (section progression) ───── */
+.btn-cancel {
+    width: 100%;
+    margin-top: 18px;
+    padding: 11px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: rgba(255, 82, 82, 0.08);
+    border: 1px solid rgba(255, 82, 82, 0.28);
+    border-radius: var(--radius-md);
+    color: var(--error);
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.btn-cancel:hover {
+    background: rgba(255, 82, 82, 0.16);
+    border-color: rgba(255, 82, 82, 0.5);
+}
+
+.btn-cancel:active { transform: scale(0.99); }
+
+/* ─── Indicateur de file d'attente ───────────── */
+.progress-queue {
+    margin-top: 10px;
+    padding: 7px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--accent-gradient-subtle);
+    border: 1px solid var(--bg-glass-border);
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 500;
+    text-align: center;
+}
+
+/* ─── Suppression dans l'historique ──────────── */
+.btn-item-action.danger:hover {
+    background: rgba(255, 82, 82, 0.12);
+    border-color: rgba(255, 82, 82, 0.35);
+    color: var(--error);
+}
+
+.btn-item-action.armed {
+    background: rgba(255, 82, 82, 0.22);
+    border-color: var(--error);
+    color: var(--error);
+    animation: armedPulse 1s ease-in-out infinite;
+}
+
+@keyframes armedPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 82, 82, 0.4); }
+    50%      { box-shadow: 0 0 0 5px rgba(255, 82, 82, 0); }
+}
+
+/* ─── Anime-Sama : mode lot ──────────────────── */
+.as-batch-toggle {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 12px;
+    color: var(--text-secondary);
+    font-size: 0.87rem;
+    cursor: pointer;
+}
+
+.as-batch-toggle input { accent-color: var(--accent-1); cursor: pointer; }
+
+.as-range-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+    font-size: 0.87rem;
+}
+
+.as-number {
+    width: 84px;
+    padding: 8px 10px;
+    background: var(--bg-glass);
+    border: 1px solid var(--bg-glass-border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9rem;
+}
+
+.as-number:focus {
+    outline: none;
+    border-color: var(--accent-1);
+}
+
+/* ─── Réglages : curseur & cases à cocher ────── */
+.range-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.setting-range {
+    flex: 1;
+    accent-color: var(--accent-1);
+    cursor: pointer;
+}
+
+.range-output {
+    min-width: 34px;
+    padding: 3px 9px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-glass);
+    border: 1px solid var(--bg-glass-border);
+    color: var(--accent-3);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.setting-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 9px 0;
+    color: var(--text-secondary);
+    font-size: 0.87rem;
+    line-height: 1.45;
+    cursor: pointer;
+}
+
+.setting-check input {
+    margin-top: 2px;
+    accent-color: var(--accent-1);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.setting-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ─── Correctif responsive : l'en-tête débordait sur mobile ─────
+   Le badge de version (« v2026.xx.xx ») poussait la barre d'outils
+   hors de l'écran et créait un défilement horizontal sur toute la page. */
+@media (max-width: 600px) {
+    .header-actions {
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        min-width: 0;
+    }
+
+    .status-badge {
+        padding: 5px 9px;
+        font-size: 0.7rem;
+        max-width: 42vw;
+        min-width: 0;
+    }
+
+    .status-badge .status-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .as-controls {
+        flex-wrap: wrap;
+    }
+
+    .as-number {
+        width: 72px;
+    }
+}
+
+/* Filet général : aucune page ne doit défiler horizontalement. */
+html, body {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+/* ═══════════════════════════════════════════════
+   TORRENT & FICHIER DIRECT
+   ═══════════════════════════════════════════════ */
+
+.torrent-section,
+.direct-section {
+    margin-bottom: 22px;
+    animation: slideUp 0.35s ease-out;
+}
+
+.torrent-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.torrent-head-actions {
+    display: flex;
+    gap: 7px;
+}
+
+.btn-mini {
+    padding: 4px 11px;
+    background: var(--bg-glass);
+    border: 1px solid var(--bg-glass-border);
+    border-radius: 100px;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.74rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.btn-mini:hover {
+    border-color: var(--accent-1);
+    color: var(--accent-1);
+}
+
+.torrent-warning {
+    margin-bottom: 10px;
+    padding: 10px 13px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 82, 82, 0.1);
+    border: 1px solid rgba(255, 82, 82, 0.3);
+    color: var(--error);
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+.torrent-files {
+    max-height: 290px;
+    overflow-y: auto;
+    border: 1px solid var(--bg-glass-border);
+    border-radius: var(--radius-md);
+    background: rgba(0, 0, 0, 0.18);
+}
+
+.torrent-file {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 9px 13px;
+    border-bottom: 1px solid var(--bg-glass-border);
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.torrent-file:last-child { border-bottom: none; }
+.torrent-file:hover { background: var(--bg-glass); }
+
+.torrent-file input {
+    accent-color: var(--accent-1);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.torrent-file-name {
+    flex: 1;
+    min-width: 0;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.torrent-file-size {
+    flex-shrink: 0;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.torrent-file.suspicious .torrent-file-name {
+    color: var(--error);
+    text-decoration: underline wavy var(--error);
+}
+
+.torrent-summary {
+    margin-top: 9px;
+    color: var(--accent-3);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.torrent-note {
+    margin-top: 11px;
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-glass);
+    border: 1px solid var(--bg-glass-border);
+    color: var(--text-secondary);
+    font-size: 0.76rem;
+    line-height: 1.55;
+}
+
+/* Statistiques BitTorrent pendant le téléchargement */
+.torrent-stats {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--bg-glass-border);
+}
+
+/* Carte « fichier direct » */
+.direct-card {
+    border: 1px solid var(--bg-glass-border);
+    border-radius: var(--radius-md);
+    background: rgba(0, 0, 0, 0.18);
+    overflow: hidden;
+}
+
+.direct-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--bg-glass-border);
+}
+
+.direct-row:last-child { border-bottom: none; }
+
+.direct-key {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+
+.direct-val {
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.btn-download:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(0.6);
+}
+
+@media (max-width: 600px) {
+    .torrent-files { max-height: 220px; }
+    .torrent-file-size { font-size: 0.72rem; }
+}
+
+/* ═══════════════════════════════════════════════
+   TYPES DE FICHIERS — pastilles & filtres
+   ═══════════════════════════════════════════════ */
+
+.torrent-exec-warning {
+    margin-bottom: 10px;
+    padding: 10px 13px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 171, 64, 0.1);
+    border: 1px solid rgba(255, 171, 64, 0.32);
+    color: var(--warning);
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+.torrent-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.torrent-filters:empty { display: none; }
+
+.filter-chip {
+    padding: 4px 11px;
+    background: var(--bg-glass);
+    border: 1px solid var(--bg-glass-border);
+    border-radius: 100px;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.73rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    white-space: nowrap;
+}
+
+.filter-chip:hover {
+    border-color: var(--accent-1);
+    color: var(--text-primary);
+}
+
+.filter-chip.active {
+    background: var(--accent-gradient-subtle);
+    border-color: var(--accent-1);
+    color: var(--text-primary);
+}
+
+/* Pastille d'extension, colorée par famille */
+.ext-pill {
+    flex-shrink: 0;
+    min-width: 42px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-align: center;
+    text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+}
+
+.ext-pill.cat-video     { background: rgba(108, 99, 255, 0.18);  border-color: rgba(108, 99, 255, 0.4);  color: #a9a3ff; }
+.ext-pill.cat-audio     { background: rgba(0, 229, 255, 0.15);   border-color: rgba(0, 229, 255, 0.35);  color: #7fe6f5; }
+.ext-pill.cat-image     { background: rgba(224, 64, 251, 0.15);  border-color: rgba(224, 64, 251, 0.35); color: #eaa0f7; }
+.ext-pill.cat-document  { background: rgba(0, 230, 118, 0.13);   border-color: rgba(0, 230, 118, 0.32);  color: #7fe6ab; }
+.ext-pill.cat-archive   { background: rgba(255, 171, 64, 0.15);  border-color: rgba(255, 171, 64, 0.35); color: #ffc987; }
+.ext-pill.cat-disque    { background: rgba(120, 144, 200, 0.18); border-color: rgba(120, 144, 200, 0.4); color: #a8b8de; }
+.ext-pill.cat-logiciel  { background: rgba(255, 82, 82, 0.15);   border-color: rgba(255, 82, 82, 0.38);  color: #ff9a9a; }
+.ext-pill.cat-soustitre { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.16); color: #c4c4dd; }
+.ext-pill.cat-donnees   { background: rgba(160, 160, 200, 0.12); border-color: rgba(160, 160, 200, 0.28); color: #b0b0cc; }
+
+/* Ligne contenant un programme exécutable */
+.torrent-file.executable .torrent-file-name::after {
+    content: ' ⚠';
+    color: var(--warning);
+    font-size: 0.8em;
+}
+
+.torrent-empty {
+    padding: 22px;
+    color: var(--text-muted);
+    font-size: 0.83rem;
+    text-align: center;
+}
+
+/* Icône d'historique teintée par famille */
+.history-item-icon.cat-audio     { color: #7fe6f5; }
+.history-item-icon.cat-image     { color: #eaa0f7; }
+.history-item-icon.cat-document  { color: #7fe6ab; }
+.history-item-icon.cat-archive   { color: #ffc987; }
+.history-item-icon.cat-disque    { color: #a8b8de; }
+.history-item-icon.cat-logiciel  { color: #ff9a9a; }
+.history-item-icon.cat-dossier   { color: var(--accent-1); }
+
+@media (max-width: 600px) {
+    .ext-pill { min-width: 36px; font-size: 0.58rem; }
+    .filter-chip { font-size: 0.68rem; padding: 3px 9px; }
 }

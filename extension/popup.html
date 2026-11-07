@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body { width: 280px; margin: 0; font-family: system-ui, -apple-system, Segoe UI, sans-serif; background: #14141c; color: #eee; }
+    .wrap { padding: 16px; }
+    h1 { font-size: 14px; margin: 0 0 4px; }
+    p { font-size: 12px; color: #9a9ab0; margin: 0 0 12px; line-height: 1.4; }
+    label { font-size: 11px; color: #9a9ab0; display: block; margin-bottom: 4px; }
+    input { width: 100%; box-sizing: border-box; padding: 7px 9px; border-radius: 7px; border: 1px solid #333; background: #1e1e2a; color: #eee; font-size: 12px; margin-bottom: 10px; }
+    button { width: 100%; padding: 9px; border: none; border-radius: 8px; background: linear-gradient(135deg,#6c63ff,#e040fb); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: default; }
+    .status { margin-top: 10px; font-size: 12px; padding: 8px; border-radius: 7px; display: none; }
+    .status.ok { background: #123d2a; color: #6ee7a8; display: block; }
+    .status.err { background: #3d1220; color: #ff8fa8; display: block; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🍪 Cookie Sync</h1>
+    <p>Envoie les cookies de ce navigateur à Video Downloader (démarrez l'app sur localhost:3000).</p>
+    <label>Domaine (vide = tous les cookies)</label>
+    <input id="domain" type="text" placeholder="ex : pornhub.com" />
+    <button id="sync">Synchroniser maintenant</button>
+    <div id="status" class="status"></div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

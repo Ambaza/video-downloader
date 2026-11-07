@@ -4,13 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Downloader — Download Any Video</title>
-    <meta name="description" content="Download videos from YouTube, Vimeo, Twitter, TikTok, and 1000+ sites with ease.">
+    <title>All File Downloader — vidéos, fichiers, magnets</title>
+    <meta name="description" content="Télécharge vidéos, fichiers directs, liens magnet et torrents depuis une seule barre de saisie.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <!-- Favicon inline : évite une requête 404 à chaque chargement -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%236C63FF'/%3E%3Cpath d='M9 7.5v9l7-4.5z' fill='white'/%3E%3C/svg%3E">
 </head>
 
 <body>
@@ -38,8 +40,8 @@
                     </svg>
                 </div>
                 <div class="logo-text">
-                    <h1>Video Downloader</h1>
-                    <span class="logo-subtitle">Download from 1000+ sites</span>
+                    <h1>All File Downloader</h1>
+                    <span class="logo-subtitle">Vidéos, fichiers directs, magnets et torrents</span>
                 </div>
             </div>
             <div class="header-actions">
@@ -69,8 +71,8 @@
         <section class="input-section" id="inputSection">
             <div class="input-card glass">
                 <div class="input-header">
-                    <h2>Paste a video link</h2>
-                    <p>YouTube, Vimeo, Twitter/X, TikTok, Instagram, Reddit, and more</p>
+                    <h2>Collez un lien</h2>
+                    <p>Vidéo, fichier direct, lien magnet ou torrent — YouTube, Vimeo, X, TikTok et 1000 autres sites</p>
                 </div>
                 <div class="url-input-wrapper">
                     <div class="url-input-container">
@@ -79,7 +81,7 @@
                             <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
                             <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
                         </svg>
-                        <input type="url" id="urlInput" placeholder="https://www.youtube.com/watch?v=..."
+                        <input type="text" id="urlInput" placeholder="https://…  ou  magnet:?xt=urn:btih:…"
                             autocomplete="off" spellcheck="false">
                         <button class="btn-paste" id="btnPaste" title="Paste from clipboard">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -159,11 +161,49 @@
 
                     <!-- Anime-Sama Episode Selection -->
                     <div class="anime-sama-section hidden" id="asSection">
-                        <label class="section-label">Select Episode & Player</label>
+                        <label class="section-label">Lecteur &amp; épisode</label>
                         <div class="as-controls">
                             <select id="asPlayerSelect" class="as-select"></select>
                             <select id="asEpisodeSelect" class="as-select"></select>
                         </div>
+                        <label class="as-batch-toggle">
+                            <input type="checkbox" id="asBatchToggle">
+                            <span>Télécharger plusieurs épisodes à la suite</span>
+                        </label>
+                        <div class="as-controls hidden" id="asBatchRange">
+                            <label class="as-range-label">Du n°
+                                <input type="number" id="asBatchFrom" class="as-number" min="1" value="1">
+                            </label>
+                            <label class="as-range-label">au n°
+                                <input type="number" id="asBatchTo" class="as-number" min="1" value="1">
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Torrent : choix des fichiers -->
+                    <div class="torrent-section hidden" id="torrentSection">
+                        <div class="torrent-head">
+                            <label class="section-label">Fichiers du torrent</label>
+                            <div class="torrent-head-actions">
+                                <button class="btn-mini" id="btnSelectAll">Tout</button>
+                                <button class="btn-mini" id="btnSelectNone">Aucun</button>
+                            </div>
+                        </div>
+                        <div class="torrent-warning hidden" id="torrentWarning"></div>
+                        <div class="torrent-exec-warning hidden" id="torrentExecWarning"></div>
+                        <div class="torrent-filters" id="torrentFilters"></div>
+                        <div class="torrent-files" id="torrentFiles"></div>
+                        <div class="torrent-summary" id="torrentSummary"></div>
+                        <p class="torrent-note">
+                            🔒 Sur BitTorrent, votre adresse IP est visible par tous les pairs de l'essaim
+                            et enregistrée par les traqueurs — contrairement à un téléchargement classique.
+                        </p>
+                    </div>
+
+                    <!-- Fichier direct -->
+                    <div class="direct-section hidden" id="directSection">
+                        <label class="section-label">Fichier</label>
+                        <div class="direct-card" id="directCard"></div>
                     </div>
 
                     <!-- Quality Selection -->
@@ -220,9 +260,37 @@
                         <span class="stat-value" id="progressSize">—</span>
                     </div>
                 </div>
+                <div class="progress-stats torrent-stats hidden" id="torrentStats">
+                    <div class="stat">
+                        <span class="stat-label">Pairs</span>
+                        <span class="stat-value" id="statPeers">—</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Sources</span>
+                        <span class="stat-value" id="statSeeders">—</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Envoi</span>
+                        <span class="stat-value" id="statUpload">—</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Ratio</span>
+                        <span class="stat-value" id="statRatio">—</span>
+                    </div>
+                </div>
                 <div class="progress-status" id="progressStatus"></div>
+                <div class="progress-queue hidden" id="progressQueue"></div>
                 <!-- Warnings during download -->
                 <div class="progress-warnings hidden" id="progressWarnings"></div>
+                <button class="btn-cancel" id="btnCancel">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="15" y1="9" x2="9" y2="15" />
+                        <line x1="9" y1="9" x2="15" y2="15" />
+                    </svg>
+                    <span>Annuler</span>
+                </button>
             </div>
         </section>
 
@@ -349,63 +417,240 @@
             </div>
 
             <div class="modal-body">
+                <div class="setting-group hidden" id="impersonateWarn" style="background:#3d2a12;border:1px solid #6b4a1f;border-radius:10px;padding:12px;">
+                    <label class="setting-label">🎭 Anti-blocage (empreinte TLS)</label>
+                    <p class="setting-desc" style="margin-bottom:6px;">Certains sites (ex. PornHub) renvoient une erreur <strong>410 / 403</strong> à yt-dlp car ils détectent qu'il ne s'agit pas d'un vrai navigateur. Pour les contourner, installez <code>curl_cffi</code> :</p>
+                    <p class="setting-value"><code>pip install -U "yt-dlp[default]" curl_cffi</code></p>
+                    <p class="setting-hint">Puis redémarrez l'application. (Rien à faire si c'est déjà actif.)</p>
+                </div>
                 <div class="setting-group">
-                    <label class="setting-label">🍪 Cookie File (for restricted content)</label>
+                    <label class="setting-label">🍪 Cookie Mode</label>
                     <p class="setting-desc">
-                        To download age-restricted or login-required videos, you need to export your
-                        browser cookies as a <code>cookies.txt</code> file.
+                        Les cookies permettent de télécharger du contenu restreint (âge, connexion requise).
+                        Le mode <strong>Auto</strong> extrait les cookies directement depuis votre navigateur — plus besoin d'exporter manuellement.
                     </p>
-                    <p id="cookieStatus" class="cookie-status inactive">⚠️ No cookie file uploaded</p>
-                    <div class="cookie-actions">
-                        <button class="btn-secondary" id="btnUploadCookie">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                                <polyline points="17 8 12 3 7 8" />
-                                <line x1="12" y1="3" x2="12" y2="15" />
-                            </svg>
-                            Upload cookies.txt
-                        </button>
-                        <input type="file" id="cookieFileInput" accept=".txt" style="display:none">
-                        <label class="toggle-wrapper">
-                            <input type="checkbox" id="useCookieToggle">
-                            <span class="toggle-label">Use cookies</span>
+
+                    <!-- Cookie Mode Radio Cards -->
+                    <div class="cookie-mode-cards" id="cookieModeCards">
+                        <label class="cookie-mode-card selected" data-mode="browser">
+                            <input type="radio" name="cookieMode" value="browser" checked>
+                            <div class="cookie-mode-card-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <circle cx="12" cy="12" r="4"/>
+                                    <line x1="21.17" y1="8" x2="12" y2="8"/>
+                                    <line x1="3.95" y1="6.06" x2="8.54" y2="14"/>
+                                    <line x1="10.88" y1="21.94" x2="15.46" y2="14"/>
+                                </svg>
+                            </div>
+                            <div class="cookie-mode-card-content">
+                                <span class="cookie-mode-card-title">Auto (Navigateur)</span>
+                                <span class="cookie-mode-card-desc">Extrait les cookies automatiquement</span>
+                            </div>
+                            <span class="cookie-mode-badge recommended">Recommandé</span>
+                        </label>
+
+                        <label class="cookie-mode-card" data-mode="all">
+                            <input type="radio" name="cookieMode" value="all">
+                            <div class="cookie-mode-card-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                                </svg>
+                            </div>
+                            <div class="cookie-mode-card-content">
+                                <span class="cookie-mode-card-title">Tous les navigateurs + Tor</span>
+                                <span class="cookie-mode-card-desc">Fusionne les cookies de tous les navigateurs ouverts</span>
+                            </div>
+                            <span class="cookie-mode-badge recommended">Multi</span>
+                        </label>
+
+                        <label class="cookie-mode-card" data-mode="extension">
+                            <input type="radio" name="cookieMode" value="extension">
+                            <div class="cookie-mode-card-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20.5 11H19V7a2 2 0 0 0-2-2h-4V3.5a2.5 2.5 0 0 0-5 0V5H4a2 2 0 0 0-2 2v3.8h1.5a2.7 2.7 0 0 1 0 5.4H2V20a2 2 0 0 0 2 2h3.8v-1.5a2.7 2.7 0 0 1 5.4 0V22H17a2 2 0 0 0 2-2v-4h1.5a2.5 2.5 0 0 0 0-5z"/>
+                                </svg>
+                            </div>
+                            <div class="cookie-mode-card-content">
+                                <span class="cookie-mode-card-title">Extension navigateur</span>
+                                <span class="cookie-mode-card-desc">Contourne le chiffrement Chrome/Edge — marche navigateur ouvert</span>
+                            </div>
+                            <span class="cookie-mode-badge recommended">Fiable</span>
+                        </label>
+
+                        <label class="cookie-mode-card" data-mode="file">
+                            <input type="radio" name="cookieMode" value="file">
+                            <div class="cookie-mode-card-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                                    <polyline points="14 2 14 8 20 8"/>
+                                    <line x1="16" y1="13" x2="8" y2="13"/>
+                                    <line x1="16" y1="17" x2="8" y2="17"/>
+                                </svg>
+                            </div>
+                            <div class="cookie-mode-card-content">
+                                <span class="cookie-mode-card-title">Fichier cookies.txt</span>
+                                <span class="cookie-mode-card-desc">Upload manuel d'un fichier exporté</span>
+                            </div>
+                        </label>
+
+                        <label class="cookie-mode-card" data-mode="none">
+                            <input type="radio" name="cookieMode" value="none">
+                            <div class="cookie-mode-card-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                                </svg>
+                            </div>
+                            <div class="cookie-mode-card-content">
+                                <span class="cookie-mode-card-title">Désactivé</span>
+                                <span class="cookie-mode-card-desc">Pas de cookies envoyés</span>
+                            </div>
                         </label>
                     </div>
                 </div>
 
+                <!-- Browser Selection (visible in 'browser' mode) -->
+                <div class="setting-group" id="browserSelectGroup">
+                    <label class="setting-label">🌐 Navigateur source</label>
+                    <p class="setting-desc">Sélectionnez le navigateur depuis lequel extraire les cookies. Utilisez celui où vous êtes connecté aux sites.</p>
+                    <select class="setting-select" id="browserSelect">
+                        <option value="chrome">Google Chrome</option>
+                        <option value="firefox">Mozilla Firefox</option>
+                        <option value="edge">Microsoft Edge</option>
+                        <option value="brave">Brave</option>
+                        <option value="opera">Opera</option>
+                        <option value="vivaldi">Vivaldi</option>
+                    </select>
+                    <p class="setting-hint">💡 Fermez votre navigateur avant de tester si vous rencontrez des erreurs DPAPI.</p>
+                </div>
+
+                <!-- Multi-browser + Tor info (visible in 'all' mode) -->
+                <div class="setting-group hidden" id="allModeGroup">
+                    <label class="setting-label">🌍 Tous les navigateurs + Tor</label>
+                    <p class="setting-desc">Au moment du téléchargement, les cookies de tous les navigateurs installés (Chrome, Edge, Brave, Firefox, Opera, Vivaldi) et de Tor sont fusionnés automatiquement.</p>
+                    <p class="setting-hint">⚠️ Chrome / Edge / Brave (v127+) chiffrent leurs cookies : ils ne sont lisibles que navigateur <strong>fermé</strong>, et pas toujours. Firefox et Tor fonctionnent même <strong>ouverts</strong>.</p>
+                    <p class="setting-hint" id="torStatus">🧅 Tor : détection…</p>
+                </div>
+
+                <!-- Extension mode (visible in 'extension' mode) -->
+                <div class="setting-group hidden" id="extModeGroup">
+                    <label class="setting-label">🧩 Extension navigateur</label>
+                    <p class="setting-desc">La solution la plus fiable : l'extension lit les cookies via le navigateur lui-même (aucun déchiffrement), même Chrome/Edge <strong>ouverts</strong>, cookies de connexion et d'âge inclus.</p>
+                    <p class="setting-hint" id="extStatus">🔌 Extension : détection…</p>
+                    <button class="btn-test-cookies" id="btnSyncExt">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                        <span>Synchroniser les cookies maintenant</span>
+                    </button>
+                    <p class="setting-hint">Pas encore installée ? Voir le dossier <code>extension/</code> (guide dans son README).</p>
+                </div>
+
+                <!-- Test Button -->
+                <div class="setting-group" id="testCookieGroup">
+                    <button class="btn-test-cookies" id="btnTestCookies">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        <span>Tester les cookies</span>
+                    </button>
+                    <div class="test-result hidden" id="testResult"></div>
+                </div>
+
+                <!-- File Upload (visible in 'file' mode) -->
+                <div class="setting-group hidden" id="fileUploadGroup">
+                    <label class="setting-label">📄 Fichier cookies.txt</label>
+                    <p id="cookieStatus" class="cookie-status inactive">⚠️ Aucun fichier cookies uploadé</p>
+                    <div class="cookie-actions">
+                        <button class="btn-secondary" id="btnUploadCookie">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                            Upload cookies.txt
+                        </button>
+                        <input type="file" id="cookieFileInput" accept=".txt" style="display:none">
+                    </div>
+                    <div class="setting-group" style="margin-top: 16px;">
+                        <label class="setting-label">Comment exporter les cookies</label>
+                        <ol class="setting-steps">
+                            <li>Installez l'extension <a
+                                    href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc"
+                                    target="_blank" style="color: var(--accent-1)">Get cookies.txt LOCALLY</a>
+                            </li>
+                            <li>Allez sur le site et <strong>connectez-vous</strong></li>
+                            <li>Cliquez sur l'extension → <strong>Export</strong></li>
+                            <li>Uploadez le fichier ici</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <!-- Performance & options de téléchargement -->
                 <div class="setting-group">
-                    <label class="setting-label">How to export cookies</label>
-                    <ol class="setting-steps">
-                        <li>Install the <a
-                                href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc"
-                                target="_blank" style="color: var(--accent-1)">Get cookies.txt LOCALLY</a> Chrome
-                            extension (or equivalent for your browser)</li>
-                        <li>Go to the site you want to download from and <strong>log in</strong></li>
-                        <li>Click the extension icon → <strong>Export</strong> → saves a <code>cookies.txt</code> file
-                        </li>
-                        <li>Upload that file here using the button above</li>
-                    </ol>
+                    <label class="setting-label">⚡ Vitesse — fragments en parallèle</label>
+                    <p class="setting-desc">Nombre de fragments HLS/DASH téléchargés simultanément. Plus haut = plus rapide sur les sites de streaming, mais plus de charge réseau.</p>
+                    <div class="range-row">
+                        <input type="range" id="fragRange" class="setting-range" min="1" max="32" step="1" value="8">
+                        <output class="range-output" id="fragValue">8</output>
+                    </div>
                 </div>
 
                 <div class="setting-group">
-                    <label class="setting-label">Downloads Folder</label>
+                    <label class="setting-label">🎭 Anti-blocage (empreinte TLS)</label>
+                    <p class="setting-desc">Imite l'empreinte d'un vrai navigateur pour contourner les erreurs 410 / 403. Nécessite <code>curl_cffi</code>.</p>
+                    <select class="setting-select" id="impersonateSelect">
+                        <option value="auto">Automatique (recommandé)</option>
+                        <option value="off">Désactivé</option>
+                    </select>
+                    <p class="setting-hint" id="impersonateStatus">—</p>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">🎞️ Contenu du fichier</label>
+                    <label class="setting-check">
+                        <input type="checkbox" id="optMetadata"> <span>Écrire les métadonnées (titre, auteur, date) dans le fichier</span>
+                    </label>
+                    <label class="setting-check">
+                        <input type="checkbox" id="optThumbnail"> <span>Incruster la miniature comme pochette</span>
+                    </label>
+                    <label class="setting-check">
+                        <input type="checkbox" id="optSubs"> <span>Incruster les sous-titres disponibles</span>
+                    </label>
+                    <p class="setting-hint">💡 Ces trois options nécessitent <strong>ffmpeg</strong>.</p>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">🔓 Avancé</label>
+                    <label class="setting-check">
+                        <input type="checkbox" id="optInsecureTLS"> <span>Ignorer les erreurs de certificat TLS</span>
+                    </label>
+                    <p class="setting-hint">⚠️ À n'activer que si un site refuse de fonctionner autrement : cela désactive la vérification du chiffrement et expose la connexion à une interception.</p>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">🧲 Moteur torrent (aria2)</label>
+                    <p class="setting-hint" id="aria2Status">—</p>
+                    <label class="setting-check">
+                        <input type="checkbox" id="optSeed"> <span>Continuer à partager après le téléchargement</span>
+                    </label>
+                    <p class="setting-hint">Désactivé, le partage s'arrête dès la fin. Activé, votre machine <strong>redistribue</strong> le contenu aux autres pairs tant que l'application tourne.</p>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">Dossier de téléchargement</label>
                     <p class="setting-value" id="downloadsDir">—</p>
                 </div>
 
                 <div class="setting-group">
-                    <label class="setting-label">Tips for Tricky Sites</label>
+                    <label class="setting-label">Tips</label>
                     <ul class="setting-tips">
-                        <li><strong>Age-restricted sites</strong> — Export cookies from your browser after logging in.
-                        </li>
-                        <li><strong>Private videos</strong> — Must be logged in before exporting cookies.</li>
-                        <li><strong>Fragment errors</strong> — Try a lower quality or refresh the page URL and retry.
-                        </li>
-                        <li><strong>Geo-restricted</strong> — Use a VPN to access content not available in your region.
-                        </li>
-                        <li><strong>Best quality</strong> — Install <a href="https://ffmpeg.org/download.html"
-                                target="_blank" style="color: var(--accent-1)">ffmpeg</a> for merging best video + audio
-                            streams.</li>
+                        <li><strong>Contenu restreint</strong> — Activez le mode Auto et connectez-vous sur le site dans votre navigateur.</li>
+                        <li><strong>Erreur DPAPI</strong> — Fermez votre navigateur avant de télécharger, ou utilisez un fichier cookies.txt.</li>
+                        <li><strong>Fragment errors</strong> — Essayez une qualité plus basse ou rafraîchissez l'URL.</li>
+                        <li><strong>Geo-restricted</strong> — Utilisez un VPN.</li>
+                        <li><strong>Meilleure qualité</strong> — Installez <a href="https://ffmpeg.org/download.html"
+                                target="_blank" style="color: var(--accent-1)">ffmpeg</a> pour fusionner vidéo + audio.</li>
                     </ul>
                 </div>
             </div>
@@ -415,7 +660,7 @@
     <!-- Toast notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <script src="app.js"></script>
+    <script src="app.js" defer></script>
 </body>
 
 </html>

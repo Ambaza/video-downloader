@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Video Downloader — Cookie Sync",
+  "version": "1.0.0",
+  "description": "Envoie les cookies du navigateur (y compris httpOnly et sessions de vérification d'âge) à l'application Video Downloader. Contourne le chiffrement App-Bound de Chrome/Edge.",
+  "permissions": ["cookies", "storage", "tabs"],
+  "host_permissions": ["<all_urls>", "http://localhost:3000/*", "http://127.0.0.1:3000/*"],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Synchroniser les cookies vers Video Downloader"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost:3000/*", "http://127.0.0.1:3000/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
