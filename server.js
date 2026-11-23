@@ -5,6 +5,9 @@ const { spawn, spawnSync, execFile } = require('child_process');
 const { randomUUID } = require('crypto');
 const os = require('os');
 const aria2lib = require('./aria2.js');
+const trackerslib = require('./trackers.js');
+// Remplacée par la liste à jour (ngosang/trackerslist) dès qu'elle est chargée.
+let TRACKERS = trackerslib.FALLBACK_TRACKERS;
 
 const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 3000;
@@ -25,6 +28,8 @@ const activeDownloads = new Map();
 const MAX_CONCURRENT_DOWNLOADS = 3;
 // Durée maximale de recherche des métadonnées d'un magnet (DHT + trackers).
 const MAGNET_SEARCH_S = 240;
+// Recherche abrégée quand tous les trackers affirment qu'il n'y a aucune source.
+const MAGNET_DEAD_S = 90;
 
 // Settings (persisted)
 const SETTINGS_FILE = path.join(__dirname, 'settings.json');
@@ -781,20 +786,99 @@ app.get('/api/info', async (req, res) => {
     return infoFromYtDlp(req, res, url);
 });
 
+// Attend qu'une recherche déjà lancée pour ce torrent aboutisse, et renvoie
+// l'identifiant du torrent (celui qui porte la liste des fichiers). null si
+// la recherche disparaît sans résultat ou si le délai est dépassé.
+async function waitForSameTorrent(hashHex, timeoutMs) {
+    const deadline = Date.now() + timeoutMs;
+    let missing = 0;
+    while (Date.now() < deadline) {
+        const st = await aria2.findByInfoHash(hashHex).catch(() => null);
+        if (st && st.following) return st.gid;
+        missing = st ? 0 : missing + 1;
+        if (missing >= 6) return null; // plus rien en cours depuis 3 s
+        await new Promise(r => setTimeout(r, 500));
+    }
+    return null;
+}
+
 // Récupère les métadonnées d'un torrent (magnet ou URL .torrent) mis en pause
 // par aria2, et renvoie la liste de ses fichiers.
 async function analyzeTorrent(res, uri, { name: fallbackName = '', infoHash = null } = {}) {
+        const hash20 = infoHash ? trackerslib.infoHashBytes(infoHash) : null;
+        const hashHex = hash20 && hash20.length === 20 ? hash20.toString('hex') : null;
+        // En parallèle de la recherche : combien de sources les trackers
+        // connaissent-ils ? Sert à dire clairement qu'un document n'existe plus.
+        const scrapeP = hashHex ? trackerslib.scrape(hashHex, TRACKERS).catch(() => null) : Promise.resolve(null);
         try {
-            // Un torrent peu partagé met parfois plusieurs minutes à livrer ses
-            // métadonnées : 90 s puis un arrêt d'aria2 à 120 s sans débit
-            // abandonnaient des magnets qui auraient fini par répondre.
-            const metaGid = await aria2.addUri([uri], { 'bt-stop-timeout': String(MAGNET_SEARCH_S + 30) });
-            let gid;
+            let gid = null, metaGid = null;
+            const started = Date.now();
             try {
-                gid = await aria2.waitForMetadata(metaGid, { timeoutMs: MAGNET_SEARCH_S * 1000 });
+                // Un torrent peu partagé met parfois plusieurs minutes à livrer
+                // ses métadonnées : 90 s puis un arrêt d'aria2 à 120 s sans
+                // débit abandonnaient des magnets qui auraient fini par répondre.
+                metaGid = await aria2.addUri([uri], { 'bt-stop-timeout': String(MAGNET_SEARCH_S + 30) });
             } catch (e) {
-                await aria2.remove(metaGid);
-                return res.status(504).json({ error: e.message });
+                // Magnet recollé alors que sa première recherche n'est pas
+                // finie : on attend son résultat et on le réutilise.
+                if (!/already registered/i.test(e.message) || !hashHex) throw e;
+                gid = await waitForSameTorrent(hashHex, MAGNET_SEARCH_S * 1000);
+                if (!gid) {
+                    return res.status(504).json({ error: 'Ce magnet est déjà en cours de recherche, sans résultat pour l\'instant. Réessayez dans un moment.' });
+                }
+            }
+            if (!gid) {
+                // Si les trackers ne connaissent aucune source (en dehors de
+                // nous), inutile d'attendre 4 minutes : un torrent vivant indexé
+                // par le DHT y est trouvé en quelques secondes. On abrège à 90 s.
+                const ac = new AbortController();
+                let fastFail = null;
+                scrapeP.then(sc => {
+                    if (sc && sc.responded >= 5 && sc.others === 0) {
+                        fastFail = setTimeout(() => ac.abort(), Math.max(0, MAGNET_DEAD_S * 1000 - (Date.now() - started)));
+                    }
+                });
+                let failure = null;
+                try {
+                    gid = await aria2.waitForMetadata(metaGid, { timeoutMs: MAGNET_SEARCH_S * 1000, signal: ac.signal });
+                } catch (e) {
+                    failure = e;
+                } finally {
+                    if (fastFail) clearTimeout(fastFail);
+                }
+                if (failure) {
+                    await aria2.remove(metaGid);
+                    // aria2 accepte un magnet recollé, puis le fait échouer
+                    // (« already registered ») : on rejoint la recherche en cours.
+                    if (/already registered/i.test(failure.message) && hashHex) {
+                        gid = await waitForSameTorrent(hashHex, MAGNET_SEARCH_S * 1000);
+                        if (!gid) {
+                            return res.status(504).json({ error: 'Ce magnet est déjà en cours de recherche, sans résultat pour l\'instant. Réessayez dans un moment.' });
+                        }
+                    } else if (failure.code !== 'SEARCH_STOPPED') {
+                        // Seule une recherche arrivée au bout se juge avec les
+                        // trackers ; toute autre erreur est rapportée telle quelle.
+                        return res.status(502).json({ error: failure.message });
+                    } else {
+                        const sc = await scrapeP;
+                        const waited = Math.max(1, Math.round((Date.now() - started) / 1000));
+                        if (sc && sc.responded > 0 && sc.others === 0) {
+                            return res.status(404).json({
+                                notFound: true,
+                                error: `Ce document n'existe plus sur le réseau BitTorrent : aucun des ${sc.responded} trackers interrogés `
+                                    + `ne lui connaît de source, et le réseau DHT n'en a trouvé aucune en ${waited} secondes. `
+                                    + 'Aucune application ne pourra le télécharger : cherchez un autre lien pour le même contenu.',
+                            });
+                        }
+                        if (sc && sc.others > 0) {
+                            return res.status(504).json({
+                                error: `Les trackers connaissent ${sc.others} pair(s) pour ce document, mais aucun n'a fourni sa description en ${waited} secondes. `
+                                    + 'Ils sont sans doute déconnectés ou derrière des pare-feu : réessayez plus tard.',
+                            });
+                        }
+                        return res.status(504).json({ error: failure.message });
+                    }
+                }
             }
             const st = await aria2.tellStatus(gid);
             const files = aria2lib.listFiles(st, DOWNLOADS_DIR);
@@ -1790,6 +1874,15 @@ aria2.start({
     if (ok) {
         console.log(`  🧲 Moteur torrent : aria2 ${aria2lib.getAria2Version()} (RPC local, port ${aria2.port})`);
         console.log(`  🔁 Partage après téléchargement : ${settings.seedAfterDownload ? 'ACTIVÉ' : 'désactivé'}`);
+        trackerslib.loadTrackers(aria2lib.STATE_DIR).then(async (list) => {
+            TRACKERS = list;
+            try {
+                await aria2.changeGlobalOption({ 'bt-tracker': list.join(',') });
+                console.log(`  📡 Trackers publics : ${list.length} (liste à jour)`);
+            } catch (e) {
+                console.log(`  📡 Trackers publics : liste de secours (${e.message})`);
+            }
+        });
     } else if (!aria2.available) {
         console.log('  🧲 Moteur torrent : aria2 non installé — magnets et torrents indisponibles.');
         console.log('     Windows :  winget install aria2.aria2     (ou scoop/choco install aria2)');

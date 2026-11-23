@@ -24,26 +24,10 @@ const IS_WINDOWS = process.platform === 'win32';
 // État persistant d'aria2 (table DHT), hors du dossier de téléchargements.
 const STATE_DIR = path.join(os.homedir(), '.video-downloader');
 
-// Trackers publics réputés, ajoutés à chaque torrent : un magnet copié depuis
-// un moteur de recherche n'en contient souvent aucun.
-// Mélange UDP et HTTP(S) : certains réseaux (entreprise, opérateur mobile)
-// bloquent l'UDP, et un magnet n'aurait alors plus aucun tracker joignable.
-const PUBLIC_TRACKERS = [
-    'udp://tracker.opentrackr.org:1337/announce',
-    'udp://open.demonii.com:1337/announce',
-    'udp://open.stealth.si:80/announce',
-    'udp://tracker.torrent.eu.org:451/announce',
-    'udp://explodie.org:6969/announce',
-    'udp://exodus.desync.com:6969/announce',
-    'udp://tracker.dler.org:6969/announce',
-    'udp://open.tracker.cl:1337/announce',
-    'udp://tracker.theoks.net:6969/announce',
-    'udp://tracker-udp.gbitt.info:80/announce',
-    'https://tracker.opentrackr.org:443/announce',
-    'http://tracker.opentrackr.org:1337/announce',
-    'https://tracker.gbitt.info:443/announce',
-    'http://tracker.files.fm:6969/announce',
-];
+// Trackers publics ajoutés à chaque torrent : un magnet copié depuis un moteur
+// de recherche n'en contient souvent aucun. La liste de secours sert au
+// démarrage ; server.js la remplace par la liste à jour dès qu'elle est chargée.
+const { FALLBACK_TRACKERS } = require('./trackers.js');
 
 // ─── Localisation du binaire ─────────────────────────────────────
 let _aria2Path = null;
@@ -175,11 +159,21 @@ class Aria2 {
             `--dht-file-path6=${path.join(STATE_DIR, 'dht6.dat')}`,
             '--enable-peer-exchange=true',
             // Trackers publics ajoutés à chaque torrent, en plus des siens.
-            `--bt-tracker=${PUBLIC_TRACKERS.join(',')}`,
+            `--bt-tracker=${FALLBACK_TRACKERS.join(',')}`,
+            // Un tracker mort bloquait 60 s par défaut avant d'être abandonné.
+            '--bt-tracker-connect-timeout=10',
+            '--bt-tracker-timeout=15',
+            // aria2 cherche de nouveaux pairs tant que le débit d'un torrent
+            // reste sous cette valeur (50 Kio/s par défaut, bien trop bas).
+            '--bt-request-peer-speed-limit=2M',
             '--bt-enable-lpd=true',
-            '--bt-max-peers=60',
+            '--bt-max-peers=120',
             `--seed-ratio=${seedRatio}`,
-            '--max-concurrent-downloads=3',
+            // La recherche des métadonnées d'un magnet occupe une place dans
+            // cette file : à 3, un lot de magnets restait en attente sans même
+            // chercher, et expirait comme s'il n'existait pas. Le nombre de
+            // vrais téléchargements simultanés est limité par server.js.
+            '--max-concurrent-downloads=24',
             '--max-connection-per-server=8',
             '--split=8',
             '--min-split-size=4M',
@@ -270,6 +264,22 @@ class Aria2 {
     // ─── Opérations de haut niveau ───────────────────────────────
 
     addUri(uris, options = {}) { return this.call('aria2.addUri', [uris, options]); }
+    changeGlobalOption(options) { return this.call('aria2.changeGlobalOption', [options]); }
+
+    // Retrouve un téléchargement déjà connu d'aria2 pour ce torrent (actif, en
+    // attente ou en pause). Sert quand un magnet est recollé avant la fin de sa
+    // première recherche : aria2 refuse alors un second ajout (« already
+    // registered »).
+    async findByInfoHash(infoHashHex) {
+        const want = String(infoHashHex || '').toLowerCase();
+        if (!/^[0-9a-f]{40}$/.test(want)) return null;
+        const keys = ['gid', 'infoHash', 'status', 'followedBy', 'following'];
+        const lists = await Promise.all([
+            this.call('aria2.tellActive', [keys]).catch(() => []),
+            this.call('aria2.tellWaiting', [0, 1000, keys]).catch(() => []),
+        ]);
+        return lists.flat().find(s => String(s.infoHash || '').toLowerCase() === want) || null;
+    }
 
     addTorrentBase64(b64, options = {}) {
         return this.call('aria2.addTorrent', [b64, [], options]);
@@ -300,9 +310,8 @@ class Aria2 {
         const deadline = Date.now() + timeoutMs;
 
         while (Date.now() < deadline) {
-            if (signal && signal.aborted) throw new Error('annulé');
+            if (signal && signal.aborted) throw Object.assign(new Error('annulé'), { code: 'SEARCH_STOPPED' });
             const st = await this.tellStatus(metaGid);
-
 
             if (st.followedBy && st.followedBy.length) {
                 return st.followedBy[0];
@@ -321,10 +330,10 @@ class Aria2 {
         // déjà) : il ne permet pas de distinguer un torrent mort d'un torrent
         // rare. Un seul message, honnête.
         const minutes = Math.round(timeoutMs / 60000);
-        throw new Error(`Aucune source n'a pu fournir ce torrent en ${minutes} minutes (trackers publics et réseau DHT interrogés). `
+        throw Object.assign(new Error(`Aucune source n'a pu fournir ce torrent en ${minutes} minutes (trackers publics et réseau DHT interrogés). `
             + 'Le plus souvent, il n\'est plus partagé par personne, et aucune application ne pourra le télécharger : '
             + 'cherchez un autre lien pour le même contenu, avec des sources actives (seeders). '
-            + 'S\'il est seulement très rare, réessayez plus tard.');
+            + 'S\'il est seulement très rare, réessayez plus tard.'), { code: 'SEARCH_STOPPED' });
     }
 }
 
@@ -525,6 +534,7 @@ function listFiles(st, downloadsDir) {
 
 module.exports = {
     Aria2,
+    STATE_DIR,
     fileCategory,
     fileExtension,
     isExecutable,
