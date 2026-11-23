@@ -5,8 +5,8 @@ Coller un lien, récupérer le fichier. Trois moteurs derrière une seule barre 
 | Vous collez… | Moteur | Ce qui se passe |
 |---|---|---|
 | une page vidéo (YouTube, Vimeo, X, TikTok…) | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | extraction du flux, choix de la qualité |
-| un **lien magnet** ou un `.torrent` | [aria2](https://aria2.github.io/) | phase métadonnées, choix des fichiers, téléchargement P2P |
-| un **fichier direct** (`.zip`, `.iso`, `.pdf`…) | aria2 | téléchargement multi-connexion |
+| un **lien magnet** ou un `.torrent` | [libtorrent](https://libtorrent.org/) (repli : aria2) | phase métadonnées, choix des fichiers, téléchargement P2P |
+| un **fichier direct** (`.zip`, `.iso`, `.pdf`, `ftp://`…) | aria2 | téléchargement multi-connexion |
 
 L'aiguillage est automatique : si yt-dlp ne reconnaît pas le site, le lien part vers aria2 comme fichier direct.
 
@@ -69,10 +69,26 @@ rien n'est téléchargé tant que vous n'avez pas validé.
 
 ### Ce qu'il faut savoir
 
+**Deux moteurs BitTorrent.** Les torrents passent par **libtorrent** (le moteur
+de qBittorrent), lancé par `bt_engine.py`. Contrairement à aria2, il parle µTP,
+perce les box (extension « holepunch », BEP 55) et ouvre un port sur la box
+quand elle le permet (UPnP / NAT-PMP) : il joint des sources rares qu'aria2 ne
+peut pas atteindre. Au premier lancement, l'application l'installe toute seule
+dans `.venv-bt` (Python 3.9+ requis, quelques minutes). Tant qu'il n'est pas
+prêt, ou s'il échoue, les torrents passent par aria2 : `GET /api/check` indique
+le moteur en service. Vérification de bout en bout :
+`.venv-bt\Scripts\python.exe tools\check_bt_engine.py`.
+
 **La phase « métadonnées » prend quelques secondes.** Un magnet ne contient pas
 la liste des fichiers, seulement l'empreinte du contenu (`btih`). L'application
-doit d'abord trouver des pairs et leur demander les métadonnées. S'il n'y a
-aucune source active, l'opération expire au bout de 90 s avec un message clair.
+doit d'abord trouver des pairs et leur demander les métadonnées. Pendant ce
+temps, elle demande aussi aux trackers combien de sources ils connaissent :
+- s'ils n'en connaissent aucune, elle annonce au bout de 90 s que **le document
+  n'existe plus** sur le réseau (aucune application ne pourra le télécharger) ;
+- sinon, elle cherche jusqu'à 4 minutes avant d'expliquer pourquoi elle échoue.
+
+Un lot de magnets est traité en parallèle, et un magnet recollé rejoint la
+recherche déjà en cours.
 
 **Désélectionner un fichier ne l'exclut pas totalement.** Les morceaux
 BitTorrent chevauchent les frontières entre fichiers : un fichier écarté peut

@@ -535,6 +535,7 @@ function listFiles(st, downloadsDir) {
 module.exports = {
     Aria2,
     STATE_DIR,
+    findFreePort,
     fileCategory,
     fileExtension,
     isExecutable,

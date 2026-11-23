@@ -148,6 +148,20 @@ const aria2 = new aria2lib.Aria2({
     },
 });
 
+// Moteur BitTorrent préféré : libtorrent (µTP, holepunch, UPnP/NAT-PMP). Il
+// parle le même langage qu'aria2. aria2 reste le moteur des fichiers directs,
+// et le repli pour les torrents tant que libtorrent n'est pas prêt.
+const { LibtorrentEngine } = require('./btengine.js');
+const bt = new LibtorrentEngine({
+    downloadsDir: DOWNLOADS_DIR,
+    onLog: (m) => { if (m) console.log('  [libtorrent]', m.slice(0, 200)); },
+});
+
+// Chaque torrent reste attaché au moteur qui l'a créé.
+const gidEngine = new Map(); // gid -> moteur
+function torrentEngine() { return bt.ready ? bt : aria2; }
+function eng(gid) { return gidEngine.get(gid) || aria2; }
+
 // Torrents dont les métadonnées sont connues mais que l'utilisateur n'a pas
 // encore lancés (en pause, en attente de sa sélection de fichiers).
 const pendingTorrents = new Map(); // gid -> { createdAt, name }
@@ -160,7 +174,8 @@ setInterval(() => {
     for (const [gid, info] of pendingTorrents) {
         if (now - info.createdAt > PENDING_TTL_MS) {
             pendingTorrents.delete(gid);
-            aria2.remove(gid).catch(() => { });
+            eng(gid).remove(gid).catch(() => { });
+            gidEngine.delete(gid);
         }
     }
 }, 5 * 60 * 1000).unref();
@@ -757,7 +772,7 @@ app.get('/api/info', async (req, res) => {
         if (!parsed) {
             return res.status(400).json({ error: 'Lien magnet invalide (identifiant btih attendu : 40 caractères hexadécimaux ou 32 en base32).' });
         }
-        if (!aria2.ready) {
+        if (!aria2.ready && !bt.ready) {
             return res.status(503).json({
                 error: aria2.available
                     ? 'Le moteur BitTorrent n\'a pas démarré. Redémarrez l\'application.'
@@ -779,7 +794,7 @@ app.get('/api/info', async (req, res) => {
     // Lien vers un fichier .torrent : même parcours qu'un magnet (liste des
     // fichiers, choix, puis téléchargement), au lieu de tout lancer d'un coup.
     if (/\.torrent$/i.test(new URL(url).pathname)) {
-        if (!aria2.ready) return res.status(503).json({ error: 'Moteur BitTorrent indisponible.' });
+        if (!aria2.ready && !bt.ready) return res.status(503).json({ error: 'Moteur BitTorrent indisponible.' });
         return analyzeTorrent(res, url, { name: decodeURIComponent(path.basename(new URL(url).pathname, '.torrent')) });
     }
 
@@ -789,11 +804,11 @@ app.get('/api/info', async (req, res) => {
 // Attend qu'une recherche déjà lancée pour ce torrent aboutisse, et renvoie
 // l'identifiant du torrent (celui qui porte la liste des fichiers). null si
 // la recherche disparaît sans résultat ou si le délai est dépassé.
-async function waitForSameTorrent(hashHex, timeoutMs) {
+async function waitForSameTorrent(E, hashHex, timeoutMs) {
     const deadline = Date.now() + timeoutMs;
     let missing = 0;
     while (Date.now() < deadline) {
-        const st = await aria2.findByInfoHash(hashHex).catch(() => null);
+        const st = await E.findByInfoHash(hashHex).catch(() => null);
         if (st && st.following) return st.gid;
         missing = st ? 0 : missing + 1;
         if (missing >= 6) return null; // plus rien en cours depuis 3 s
@@ -805,11 +820,19 @@ async function waitForSameTorrent(hashHex, timeoutMs) {
 // Récupère les métadonnées d'un torrent (magnet ou URL .torrent) mis en pause
 // par aria2, et renvoie la liste de ses fichiers.
 async function analyzeTorrent(res, uri, { name: fallbackName = '', infoHash = null } = {}) {
+        const E = torrentEngine();
         const hash20 = infoHash ? trackerslib.infoHashBytes(infoHash) : null;
         const hashHex = hash20 && hash20.length === 20 ? hash20.toString('hex') : null;
-        // En parallèle de la recherche : combien de sources les trackers
-        // connaissent-ils ? Sert à dire clairement qu'un document n'existe plus.
-        const scrapeP = hashHex ? trackerslib.scrape(hashHex, TRACKERS).catch(() => null) : Promise.resolve(null);
+        // Combien de sources les trackers connaissent-ils ? Sert à dire
+        // clairement qu'un document n'existe plus. On le demande AVANT d'ajouter
+        // le torrent : une fois annoncé, le moteur serait lui-même compté (en
+        // IPv4 et en IPv6) et un document inexistant semblerait avoir des
+        // sources. Réponse dès que 5 trackers ont répondu (souvent < 1 s),
+        // 2,5 s au plus.
+        const sc0 = hashHex
+            ? await trackerslib.scrape(hashHex, TRACKERS, { timeoutMs: 2500, enough: 5 }).catch(() => null)
+            : null;
+        const scrapeP = Promise.resolve(sc0);
         try {
             let gid = null, metaGid = null;
             const started = Date.now();
@@ -817,12 +840,15 @@ async function analyzeTorrent(res, uri, { name: fallbackName = '', infoHash = nu
                 // Un torrent peu partagé met parfois plusieurs minutes à livrer
                 // ses métadonnées : 90 s puis un arrêt d'aria2 à 120 s sans
                 // débit abandonnaient des magnets qui auraient fini par répondre.
-                metaGid = await aria2.addUri([uri], { 'bt-stop-timeout': String(MAGNET_SEARCH_S + 30) });
+                metaGid = await E.addUri([uri], { 'bt-stop-timeout': String(MAGNET_SEARCH_S + 30) });
             } catch (e) {
                 // Magnet recollé alors que sa première recherche n'est pas
                 // finie : on attend son résultat et on le réutilise.
-                if (!/already registered/i.test(e.message) || !hashHex) throw e;
-                gid = await waitForSameTorrent(hashHex, MAGNET_SEARCH_S * 1000);
+                // Un lien .torrent ne porte pas son identifiant : on le lit dans
+                // le message d'erreur (« InfoHash … is already registered »).
+                const dupHash = hashHex || (/InfoHash ([0-9a-f]{40})/i.exec(e.message) || [])[1];
+                if (!/already registered/i.test(e.message) || !dupHash) throw e;
+                gid = await waitForSameTorrent(E, dupHash.toLowerCase(), MAGNET_SEARCH_S * 1000);
                 if (!gid) {
                     return res.status(504).json({ error: 'Ce magnet est déjà en cours de recherche, sans résultat pour l\'instant. Réessayez dans un moment.' });
                 }
@@ -840,18 +866,19 @@ async function analyzeTorrent(res, uri, { name: fallbackName = '', infoHash = nu
                 });
                 let failure = null;
                 try {
-                    gid = await aria2.waitForMetadata(metaGid, { timeoutMs: MAGNET_SEARCH_S * 1000, signal: ac.signal });
+                    gid = await E.waitForMetadata(metaGid, { timeoutMs: MAGNET_SEARCH_S * 1000, signal: ac.signal });
                 } catch (e) {
                     failure = e;
                 } finally {
                     if (fastFail) clearTimeout(fastFail);
                 }
                 if (failure) {
-                    await aria2.remove(metaGid);
+                    await E.remove(metaGid);
                     // aria2 accepte un magnet recollé, puis le fait échouer
                     // (« already registered ») : on rejoint la recherche en cours.
-                    if (/already registered/i.test(failure.message) && hashHex) {
-                        gid = await waitForSameTorrent(hashHex, MAGNET_SEARCH_S * 1000);
+                    const dupHash = hashHex || (/InfoHash ([0-9a-f]{40})/i.exec(failure.message) || [])[1];
+                    if (/already registered/i.test(failure.message) && dupHash) {
+                        gid = await waitForSameTorrent(E, dupHash.toLowerCase(), MAGNET_SEARCH_S * 1000);
                         if (!gid) {
                             return res.status(504).json({ error: 'Ce magnet est déjà en cours de recherche, sans résultat pour l\'instant. Réessayez dans un moment.' });
                         }
@@ -880,7 +907,8 @@ async function analyzeTorrent(res, uri, { name: fallbackName = '', infoHash = nu
                     }
                 }
             }
-            const st = await aria2.tellStatus(gid);
+            gidEngine.set(gid, E);
+            const st = await E.tellStatus(gid);
             const files = aria2lib.listFiles(st, DOWNLOADS_DIR);
             const name = aria2lib.statusName(st) || fallbackName || infoHash || 'torrent';
             pendingTorrents.set(gid, { createdAt: Date.now(), name });
@@ -1097,7 +1125,7 @@ function streamAria2(req, res, gid, { label = '' } = {}) {
         if (closed) return;
         let st;
         try {
-            st = await aria2.tellStatus(gid);
+            st = await eng(gid).tellStatus(gid);
         } catch (e) {
             // Le téléchargement a disparu d'aria2 (retiré, ou démon arrêté)
             const entry = activeDownloads.get(gid);
@@ -1149,7 +1177,7 @@ function streamAria2(req, res, gid, { label = '' } = {}) {
         const entry = activeDownloads.get(gid);
         if (entry && !entry.keepOnDisconnect) {
             activeDownloads.delete(gid);
-            aria2.remove(gid).catch(() => { });
+            eng(gid).remove(gid).catch(() => { });
         }
     });
 }
@@ -1168,11 +1196,11 @@ app.get('/api/download', (req, res) => {
         const info = pendingTorrents.get(gid);
         return (async () => {
             try {
-                const st = await aria2.tellStatus(gid);
+                const st = await eng(gid).tellStatus(gid);
                 const count = (st.files || []).length;
                 const selection = sanitizeFileSelection(req.query.files, count);
-                if (selection) await aria2.changeOption(gid, { 'select-file': selection });
-                await aria2.unpause(gid);
+                if (selection) await eng(gid).changeOption(gid, { 'select-file': selection });
+                await eng(gid).unpause(gid);
             } catch (e) {
                 return res.status(500).json({ error: 'Impossible de démarrer le torrent : ' + e.message });
             }
@@ -1406,9 +1434,12 @@ app.post('/api/cancel', async (req, res) => {
     const entry = typeof downloadId === 'string' ? activeDownloads.get(downloadId) : null;
     if (entry && entry.aria2) {
         entry.cancelled = true;
-        await aria2.remove(downloadId).catch(() => { });
-        activeDownloads.delete(downloadId);
+        await eng(downloadId).remove(downloadId).catch(() => { });
+        // L'entrée reste en place : la diffusion de la progression la lit pour
+        // annoncer « annulé » (et non « le moteur ne répond plus »), puis la
+        // retire elle-même.
         pendingTorrents.delete(downloadId);
+        gidEngine.delete(downloadId);
         return res.json({ success: true });
     }
     if (entry) {
@@ -1600,10 +1631,13 @@ app.post('/api/settings', (req, res) => {
         settings.seedAfterDownload = !!body.seedAfterDownload;
         // Le partage continue après réception : on l'applique à chaud.
         if (aria2.ready) {
-            aria2.call('aria2.changeGlobalOption', [{
-                'seed-ratio': settings.seedAfterDownload ? '1.0' : '0.0',
-                'seed-time': settings.seedAfterDownload ? '' : '0',
-            }]).catch(() => { });
+            for (const E of [aria2, bt]) {
+                if (!E.ready) continue;
+                E.call('aria2.changeGlobalOption', [{
+                    'seed-ratio': settings.seedAfterDownload ? '1.0' : '0.0',
+                    'seed-time': settings.seedAfterDownload ? '' : '0',
+                }]).catch(() => { });
+            }
         }
     }
     if (body.btListenPort !== undefined) {
@@ -1822,6 +1856,8 @@ app.get('/api/check', (req, res) => {
             version: version.trim(),
             downloadsDir: DOWNLOADS_DIR,
             hasCookieFile: hasCookieFile(),
+            torrentEngine: bt.ready ? bt.version : (aria2.ready ? `aria2 ${aria2lib.getAria2Version()}` : null),
+            libtorrent: bt.status,
         });
     });
 });
@@ -1852,6 +1888,7 @@ async function shutdown() {
     // On ATTEND qu'aria2 soit sorti : sinon le processus survit à l'app,
     // rattaché à init, et continue de partager en arrière-plan.
     try { await aria2.stop(); } catch { }
+    try { await bt.stop(); } catch { }
     process.exit(0);
 }
 process.on('SIGINT', shutdown);
@@ -1878,6 +1915,7 @@ aria2.start({
             TRACKERS = list;
             try {
                 await aria2.changeGlobalOption({ 'bt-tracker': list.join(',') });
+                if (bt.ready) await bt.changeGlobalOption({ 'bt-tracker': list.join(',') }).catch(() => { });
                 console.log(`  📡 Trackers publics : ${list.length} (liste à jour)`);
             } catch (e) {
                 console.log(`  📡 Trackers publics : liste de secours (${e.message})`);
@@ -1888,6 +1926,17 @@ aria2.start({
         console.log('     Windows :  winget install aria2.aria2     (ou scoop/choco install aria2)');
     } else {
         console.log(`  🧲 Moteur torrent : échec du démarrage — ${aria2.startError}`);
+    }
+});
+
+// libtorrent s'installe au premier lancement (quelques minutes) : en attendant,
+// les torrents passent par aria2.
+bt.start({ seedAfterDownload: settings.seedAfterDownload }).then(async (ok) => {
+    if (ok) {
+        console.log(`  🧲 Moteur torrent préféré : ${bt.version} (µTP, holepunch, UPnP/NAT-PMP)`);
+        if (TRACKERS.length) await bt.changeGlobalOption({ 'bt-tracker': TRACKERS.join(',') }).catch(() => { });
+    } else {
+        console.log(`  🧲 libtorrent indisponible (${bt.startError}) — les torrents passent par aria2.`);
     }
 });
 

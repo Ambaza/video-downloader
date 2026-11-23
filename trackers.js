@@ -153,25 +153,43 @@ async function scrapeHttp(announceUrl, hash20, timeoutMs, fetchImpl = globalThis
 }
 
 // Interroge tous les trackers en parallèle. « responded » = nombre de
-// trackers qui ont répondu ; seeders/leechers = le maximum annoncé.
-async function scrape(infoHash, trackers, { timeoutMs = 6000, fetchImpl } = {}) {
+// trackers qui ont répondu ; seeders/leechers = le maximum annoncé ;
+// « others » = le plus grand nombre de pairs connus par un même tracker.
+//
+// À appeler AVANT d'ajouter le torrent au moteur : une fois annoncé, le moteur
+// est lui-même compté par les trackers (deux fois, en IPv4 et en IPv6), et un
+// document inexistant semblerait avoir des sources. « enough » permet de
+// répondre dès que ce nombre de trackers a répondu, sans attendre les morts.
+function scrape(infoHash, trackers, { timeoutMs = 6000, enough = Infinity, fetchImpl } = {}) {
     const hash20 = infoHashBytes(infoHash);
-    if (!hash20 || hash20.length !== 20) return { responded: 0, seeders: 0, leechers: 0, supported: false };
-    const results = await Promise.all(trackers.map(t => t.startsWith('udp:')
-        ? scrapeUdp(t, hash20, timeoutMs)
-        : scrapeHttp(t, hash20, timeoutMs, fetchImpl)));
-    const ok = results.filter(Boolean);
-    // Pendant sa recherche, aria2 s'annonce lui-même à ces trackers : il compte
-    // alors pour 1 (en seeder, faute de connaître la taille). « others » est le
-    // nombre de pairs en plus de nous, sur le tracker qui en connaît le plus.
-    const peak = ok.reduce((m, x) => Math.max(m, x.seeders + x.leechers), 0);
-    return {
-        supported: true,
-        responded: ok.length,
-        seeders: ok.reduce((m, x) => Math.max(m, x.seeders), 0),
-        leechers: ok.reduce((m, x) => Math.max(m, x.leechers), 0),
-        others: Math.max(0, peak - 1),
-    };
+    if (!hash20 || hash20.length !== 20) {
+        return Promise.resolve({ responded: 0, seeders: 0, leechers: 0, others: 0, supported: false });
+    }
+    return new Promise((resolve) => {
+        const ok = [];
+        let pending = trackers.length, done = false;
+        const summary = () => {
+            const peak = ok.reduce((m, x) => Math.max(m, x.seeders + x.leechers), 0);
+            return {
+                supported: true,
+                responded: ok.length,
+                seeders: ok.reduce((m, x) => Math.max(m, x.seeders), 0),
+                leechers: ok.reduce((m, x) => Math.max(m, x.leechers), 0),
+                others: peak,
+            };
+        };
+        const finish = () => { if (!done) { done = true; clearTimeout(timer); resolve(summary()); } };
+        const timer = setTimeout(finish, timeoutMs + 200);
+        if (!pending) return finish();
+        for (const t of trackers) {
+            const p = t.startsWith('udp:') ? scrapeUdp(t, hash20, timeoutMs) : scrapeHttp(t, hash20, timeoutMs, fetchImpl);
+            p.then((r) => {
+                if (done) return;
+                if (r) ok.push(r);
+                if (--pending === 0 || ok.length >= enough) finish();
+            }, () => { if (!done && --pending === 0) finish(); });
+        }
+    });
 }
 
 module.exports = { loadTrackers, scrape, parseList, infoHashBytes, scrapeUdp, scrapeHttp, FALLBACK_TRACKERS };

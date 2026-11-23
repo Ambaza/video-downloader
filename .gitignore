@@ -15,3 +15,5 @@ venv/
 !.env.example
 .demo_ready
 dist/
+.venv-bt/
+__pycache__/
