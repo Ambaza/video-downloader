@@ -443,15 +443,21 @@ function getImpersonateTargets() {
     try {
         const ytdlp = getYtDlpPath();
         const r = spawnSync(ytdlp, ['--list-impersonate-targets'], { windowsHide: true, timeout: 15000, encoding: 'utf8' });
-        const out = (r.stdout || '') + '\n' + (r.stderr || '');
-        for (const line of out.split('\n')) {
+        // Seul stdout porte le tableau : stderr contient des avertissements
+        // (« your yt-dlp version is older… ») ou une trace Python, dont les mots
+        // étaient pris pour des navigateurs (« it », « you », « traceback »…).
+        // Une ligne valable a trois colonnes : client, OS, source (curl_cffi…).
+        for (const line of (r.stdout || '').split('\n')) {
             const l = line.trim();
-            if (!l || l.startsWith('[') || l.startsWith('Client') || l.startsWith('---')) continue;
-            if (/\(unavailable\)/i.test(l)) continue; // cible listée mais curl_cffi absent
-            const client = l.split(/\s+/)[0].toLowerCase();
-            if (client && /^[a-z0-9_.-]+$/.test(client) && !_impersonateTargets.includes(client)) {
-                _impersonateTargets.push(client);
-            }
+            if (!l || /\(unavailable\)/i.test(l)) continue; // cible listée mais curl_cffi absent
+            const cols = l.split(/\s{2,}|\t/).filter(Boolean);
+            if (cols.length < 3) continue;
+            const m = /^([a-z]+)(?:-[\d.]+)?$/i.exec(cols[0]);
+            if (!m || /^client$/i.test(cols[0])) continue;
+            // yt-dlp accepte la famille seule (« chrome ») : il prend alors sa
+            // version la plus récente disponible.
+            const family = m[1].toLowerCase();
+            if (!_impersonateTargets.includes(family)) _impersonateTargets.push(family);
         }
     } catch { }
     return _impersonateTargets;

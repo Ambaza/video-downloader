@@ -21,6 +21,20 @@ const os = require('os');
 
 const IS_WINDOWS = process.platform === 'win32';
 
+// État persistant d'aria2 (table DHT), hors du dossier de téléchargements.
+const STATE_DIR = path.join(os.homedir(), '.video-downloader');
+
+// Trackers publics réputés, ajoutés à chaque torrent : un magnet copié depuis
+// un moteur de recherche n'en contient souvent aucun.
+const PUBLIC_TRACKERS = [
+    'udp://tracker.opentrackr.org:1337/announce',
+    'udp://open.demonii.com:1337/announce',
+    'udp://open.stealth.si:80/announce',
+    'udp://tracker.torrent.eu.org:451/announce',
+    'udp://explodie.org:6969/announce',
+    'udp://exodus.desync.com:6969/announce',
+];
+
 // ─── Localisation du binaire ─────────────────────────────────────
 let _aria2Path = null;
 let _aria2Checked = false;
@@ -37,6 +51,9 @@ function getAria2Path() {
             'C:\\Program Files\\aria2\\aria2c.exe',
             'C:\\Program Files (x86)\\aria2\\aria2c.exe',
             path.join(os.homedir(), 'scoop', 'shims', 'aria2c.exe'),
+            // winget : lien posé ici, mais absent du PATH d'un processus lancé
+            // avant l'installation (le hub du catalogue, par exemple).
+            path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Microsoft', 'WinGet', 'Links', 'aria2c.exe'),
             path.join(process.env.ChocolateyInstall || 'C:\\ProgramData\\chocolatey', 'bin', 'aria2c.exe'),
         );
     } else {
@@ -101,6 +118,7 @@ class Aria2 {
         if (!bin) { this.startError = 'aria2c introuvable'; return false; }
 
         this.port = await findFreePort();
+        try { fs.mkdirSync(STATE_DIR, { recursive: true }); } catch { }
 
         const seedRatio = options.seedAfterDownload ? '1.0' : '0.0';
         const seedTime = options.seedAfterDownload ? '' : '--seed-time=0';
@@ -134,6 +152,15 @@ class Aria2 {
             '--file-allocation=none',
             '--follow-torrent=true',
             '--enable-dht=true',
+            // Un magnet sans tracker (« magnet:?xt=urn:btih:… » seul) ne trouve
+            // ses pairs que par le DHT. Sans point d'entrée ni table enregistrée,
+            // le DHT d'aria2 démarre vide à chaque lancement et le magnet reste
+            // indéfiniment à 0 octet : on l'amorce, et on garde la table entre
+            // deux lancements.
+            '--dht-entry-point=dht.transmissionbt.com:6881',
+            `--dht-file-path=${path.join(STATE_DIR, 'dht.dat')}`,
+            // Trackers publics ajoutés à chaque torrent, en plus des siens.
+            `--bt-tracker=${PUBLIC_TRACKERS.join(',')}`,
             '--bt-enable-lpd=true',
             '--bt-max-peers=60',
             `--seed-ratio=${seedRatio}`,
