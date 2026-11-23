@@ -616,7 +616,7 @@
         }
         try {
             const u = new URL(str);
-            return ['http:', 'https:'].includes(u.protocol);
+            return ['http:', 'https:', 'ftp:', 'sftp:'].includes(u.protocol);
         } catch {
             return false;
         }
@@ -632,14 +632,14 @@
         }
 
         if (!isValidUrl(url)) {
-            showToast('Lien invalide : une adresse http(s) ou un lien magnet est attendu.', 'warning');
+            showToast('Lien invalide : une adresse http(s), ftp ou un lien magnet est attendu.', 'warning');
             urlInput.focus();
             return;
         }
 
         showSection('loading');
         if (isMagnet(url)) {
-            $('#loadingText') && ($('#loadingText').textContent = 'Recherche de pairs…');
+            $('#loadingText') && ($('#loadingText').textContent = 'Recherche de pairs… (jusqu\'à 4 minutes pour un torrent peu partagé)');
         }
 
         try {

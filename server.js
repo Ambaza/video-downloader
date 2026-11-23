@@ -23,6 +23,8 @@ if (!fs.existsSync(DOWNLOADS_DIR)) {
 const activeDownloads = new Map();
 // Limite de téléchargements simultanés (protège CPU / bande passante / disque)
 const MAX_CONCURRENT_DOWNLOADS = 3;
+// Durée maximale de recherche des métadonnées d'un magnet (DHT + trackers).
+const MAGNET_SEARCH_S = 240;
 
 // Settings (persisted)
 const SETTINGS_FILE = path.join(__dirname, 'settings.json');
@@ -167,7 +169,7 @@ function sanitizeUrl(raw) {
     if (!value || value.length > 2048) return null;
     let u;
     try { u = new URL(value); } catch { return null; }
-    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    if (!['http:', 'https:', 'ftp:', 'sftp:'].includes(u.protocol)) return null;
     return u.toString();
 }
 
@@ -757,25 +759,53 @@ app.get('/api/info', async (req, res) => {
                     : 'aria2 n\'est pas installé — requis pour les liens magnet et les torrents. Voir le README.',
             });
         }
+        return analyzeTorrent(res, parsed.magnet, { name: parsed.displayName, infoHash: parsed.infoHash });
+    }
+
+    const url = sanitizeUrl(raw);
+    if (!url) return res.status(400).json({ error: 'URL invalide (http, https, ftp ou magnet attendu).' });
+
+    // FTP / SFTP : aucun site vidéo derrière, aria2 télécharge directement.
+    if (/^s?ftp:/i.test(url)) {
+        if (!aria2.ready) return res.status(503).json({ error: 'Moteur de téléchargement indisponible.' });
+        return res.json(await probeDirectFile(url));
+    }
+
+    // Lien vers un fichier .torrent : même parcours qu'un magnet (liste des
+    // fichiers, choix, puis téléchargement), au lieu de tout lancer d'un coup.
+    if (/\.torrent$/i.test(new URL(url).pathname)) {
+        if (!aria2.ready) return res.status(503).json({ error: 'Moteur BitTorrent indisponible.' });
+        return analyzeTorrent(res, url, { name: decodeURIComponent(path.basename(new URL(url).pathname, '.torrent')) });
+    }
+
+    return infoFromYtDlp(req, res, url);
+});
+
+// Récupère les métadonnées d'un torrent (magnet ou URL .torrent) mis en pause
+// par aria2, et renvoie la liste de ses fichiers.
+async function analyzeTorrent(res, uri, { name: fallbackName = '', infoHash = null } = {}) {
         try {
-            const metaGid = await aria2.addUri([parsed.magnet], { 'bt-stop-timeout': '120' });
+            // Un torrent peu partagé met parfois plusieurs minutes à livrer ses
+            // métadonnées : 90 s puis un arrêt d'aria2 à 120 s sans débit
+            // abandonnaient des magnets qui auraient fini par répondre.
+            const metaGid = await aria2.addUri([uri], { 'bt-stop-timeout': String(MAGNET_SEARCH_S + 30) });
             let gid;
             try {
-                gid = await aria2.waitForMetadata(metaGid, { timeoutMs: 90000 });
+                gid = await aria2.waitForMetadata(metaGid, { timeoutMs: MAGNET_SEARCH_S * 1000 });
             } catch (e) {
                 await aria2.remove(metaGid);
                 return res.status(504).json({ error: e.message });
             }
             const st = await aria2.tellStatus(gid);
             const files = aria2lib.listFiles(st, DOWNLOADS_DIR);
-            const name = aria2lib.statusName(st) || parsed.displayName || parsed.infoHash;
+            const name = aria2lib.statusName(st) || fallbackName || infoHash || 'torrent';
             pendingTorrents.set(gid, { createdAt: Date.now(), name });
 
             return res.json({
                 kind: 'torrent',
                 gid,
                 title: name,
-                infoHash: parsed.infoHash,
+                infoHash: st.infoHash || infoHash,
                 totalSize: files.reduce((n, f) => n + f.size, 0),
                 totalSizeLabel: aria2lib.formatBytes(files.reduce((n, f) => n + f.size, 0)),
                 files,
@@ -791,13 +821,12 @@ app.get('/api/info', async (req, res) => {
                 presets: [],
             });
         } catch (e) {
-            return res.status(500).json({ error: 'Échec de la lecture du magnet : ' + e.message });
+            return res.status(500).json({ error: 'Échec de la lecture du torrent : ' + e.message });
         }
-    }
+}
 
-    const url = sanitizeUrl(raw);
-    if (!url) return res.status(400).json({ error: 'URL invalide (http, https ou magnet attendu).' });
-
+// Lien http(s) : site vidéo (yt-dlp) ou, à défaut, fichier direct (aria2).
+async function infoFromYtDlp(req, res, url) {
     if (isAnimeSamaUrl(url)) {
         const asData = await parseAnimeSama(url);
         if (asData) {
@@ -946,7 +975,7 @@ app.get('/api/info', async (req, res) => {
     };
 
     runInfo(0, false);
-});
+}
 
 // ─── Diffusion SSE de la progression d'un téléchargement aria2 ────
 function streamAria2(req, res, gid, { label = '' } = {}) {

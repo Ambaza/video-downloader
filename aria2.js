@@ -26,6 +26,8 @@ const STATE_DIR = path.join(os.homedir(), '.video-downloader');
 
 // Trackers publics réputés, ajoutés à chaque torrent : un magnet copié depuis
 // un moteur de recherche n'en contient souvent aucun.
+// Mélange UDP et HTTP(S) : certains réseaux (entreprise, opérateur mobile)
+// bloquent l'UDP, et un magnet n'aurait alors plus aucun tracker joignable.
 const PUBLIC_TRACKERS = [
     'udp://tracker.opentrackr.org:1337/announce',
     'udp://open.demonii.com:1337/announce',
@@ -33,6 +35,14 @@ const PUBLIC_TRACKERS = [
     'udp://tracker.torrent.eu.org:451/announce',
     'udp://explodie.org:6969/announce',
     'udp://exodus.desync.com:6969/announce',
+    'udp://tracker.dler.org:6969/announce',
+    'udp://open.tracker.cl:1337/announce',
+    'udp://tracker.theoks.net:6969/announce',
+    'udp://tracker-udp.gbitt.info:80/announce',
+    'https://tracker.opentrackr.org:443/announce',
+    'http://tracker.opentrackr.org:1337/announce',
+    'https://tracker.gbitt.info:443/announce',
+    'http://tracker.files.fm:6969/announce',
 ];
 
 // ─── Localisation du binaire ─────────────────────────────────────
@@ -159,6 +169,11 @@ class Aria2 {
             // deux lancements.
             '--dht-entry-point=dht.transmissionbt.com:6881',
             `--dht-file-path=${path.join(STATE_DIR, 'dht.dat')}`,
+            // Une bonne part des pairs n'est joignable qu'en IPv6.
+            '--enable-dht6=true',
+            '--dht-entry-point6=dht.transmissionbt.com:6881',
+            `--dht-file-path6=${path.join(STATE_DIR, 'dht6.dat')}`,
+            '--enable-peer-exchange=true',
             // Trackers publics ajoutés à chaque torrent, en plus des siens.
             `--bt-tracker=${PUBLIC_TRACKERS.join(',')}`,
             '--bt-enable-lpd=true',
@@ -283,9 +298,11 @@ class Aria2 {
     // avec un fichier de quelques kilo-octets.
     async waitForMetadata(metaGid, { timeoutMs = 90000, signal } = {}) {
         const deadline = Date.now() + timeoutMs;
+
         while (Date.now() < deadline) {
             if (signal && signal.aborted) throw new Error('annulé');
             const st = await this.tellStatus(metaGid);
+
 
             if (st.followedBy && st.followedBy.length) {
                 return st.followedBy[0];
@@ -299,7 +316,15 @@ class Aria2 {
             }
             await new Promise(r => setTimeout(r, 500));
         }
-        throw new Error('Aucun pair trouvé pour ce magnet (délai dépassé). Le contenu est peut-être sans source active.');
+        // Le nombre de connexions d'aria2 compte aussi des échanges qui ne sont
+        // pas des pairs possédant le torrent (un identifiant inventé en montre
+        // déjà) : il ne permet pas de distinguer un torrent mort d'un torrent
+        // rare. Un seul message, honnête.
+        const minutes = Math.round(timeoutMs / 60000);
+        throw new Error(`Aucune source n'a pu fournir ce torrent en ${minutes} minutes (trackers publics et réseau DHT interrogés). `
+            + 'Le plus souvent, il n\'est plus partagé par personne, et aucune application ne pourra le télécharger : '
+            + 'cherchez un autre lien pour le même contenu, avec des sources actives (seeders). '
+            + 'S\'il est seulement très rare, réessayez plus tard.');
     }
 }
 
